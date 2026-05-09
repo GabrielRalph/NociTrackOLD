@@ -26,7 +26,7 @@ export class AssessmentRepository {
     const cacheKey = `${source}:${assessmentId}`;
 
     if (this.assessmentCache.has(cacheKey)) {
-      return this.assessmentCache.get(cacheKey);
+      return new Assessment(this.assessmentCache.get(cacheKey));
     }
 
     const sourceLoader = this.sources[source];
@@ -41,10 +41,9 @@ export class AssessmentRepository {
       throw new Error(`Assessment not found: ${assessmentId}`);
     }
 
-    const assessment = new Assessment(assessmentData);
-    this.assessmentCache.set(cacheKey, assessment);
+    this.assessmentCache.set(cacheKey, assessmentData);
 
-    return assessment;
+    return new Assessment(assessmentData);
   }
 
   /** Load and cache the list of available assessments for a source. */

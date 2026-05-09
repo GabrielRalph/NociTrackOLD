@@ -1,48 +1,199 @@
+import { Answer } from "./models/Answer.js";
 import { AssessmentRepository } from "./services/AssessmentRepository.js";
+import { SquidlyStateStore } from "./services/SquidlyStateStore.js";
+import { AssessmentViews } from "./ui/AssessmentViews.js";
 
 const DEFAULT_SOURCE = "default_bank";
+const STATE_MENU = "menu";
+const STATE_ASSESSMENT = "assessment";
+const STATE_RESULT = "result";
 
 class PainManagementApp {
   /** Create the app coordinator for one assessment source. */
-  constructor({ assessmentId = "fear-of-pain", source = null } = {}) {
-    this.assessmentId = assessmentId;
-    this.assessment = null;
+  constructor({ source = DEFAULT_SOURCE } = {}) {
     this.source = source;
     this.assessmentRepo = new AssessmentRepository();
-    this.state = "menu";
+    this.stateStore = new SquidlyStateStore();
+    this.views = new AssessmentViews();
+
+    this.state = STATE_MENU;
+    this.assessmentId = null;
+    this.assessmentIndex = [];
+    this.assessment = null;
+    this.answersPayload = null;
+    this.renderQueued = false;
+
+    this.root = null;
+
+    this.init();
   }
 
-  /** Register remote listeners and load the initial assessment when available. */
+  /** Create UI, load assessment metadata, and start Firebase sync. */
   async init() {
-    // this.addListeners();
+    this.createUI();
+    this.addListeners();
 
-    if (!this.assessmentId) {
-      return;
-    }
-
-    this.assessment = await this.assessmentRepo.fetchAssessment(
-      this.assessmentId,
+    this.assessmentIndex = await this.assessmentRepo.fetchAssessmentIndex(
       this.source,
     );
-    console.log(this.assessment);
+
+    this.initDefaultFirebaseValues();
+    this.requestRender();
+  }
+
+  /** Create the single render root. Screens replace this root's children. */
+  createUI() {
+    this.root = document.createElement("div");
+    this.root.className =
+      "flex min-h-screen items-center justify-center px-8 py-6";
+    document.body.appendChild(this.root);
+  }
+
+  /** Seed remote state for a fresh session. */
+  initDefaultFirebaseValues() {
+    this.setFirebaseValue("state", STATE_MENU);
   }
 
   /** Keep local app state in sync with Squidly/Firebase values. */
   addListeners() {
-    SquidlyAPI.firebaseOnValue("assessmentId", (value) => {
-      if (value) this.assessmentId = value;
-    });
+    this.stateStore.onValue("state", async (value) => {
+      if (!value) return;
 
-    SquidlyAPI.firebaseOnValue("state", (value) => {
-      if (value) this.state = value;
-    });
+      this.state = value;
 
-    SquidlyAPI.firebaseOnValue("assessmentAnswers", (value) => {
-      if (value) {
-        const payload = JSON.parse(value);
-        console.log(payload);
+      if (this.state === STATE_ASSESSMENT && this.assessmentId) {
+        await this.loadAssessment(this.assessmentId);
       }
+
+      this.requestRender();
     });
+
+    this.stateStore.onValue("assessmentId", async (value) => {
+      if (!value) return;
+
+      this.assessmentId = value;
+
+      if (this.state === STATE_ASSESSMENT) {
+        await this.loadAssessment(value);
+      }
+
+      this.requestRender();
+    });
+
+    this.stateStore.onValue("assessmentAnswers", (value) => {
+      if (!value) return;
+
+      this.answersPayload = JSON.parse(value);
+      this.applyAnswerPayload();
+
+      this.requestRender();
+    });
+  }
+
+  /** Load the selected assessment and apply any existing answer payload. */
+  async loadAssessment(assessmentId) {
+    this.assessment = await this.assessmentRepo.fetchAssessment(
+      assessmentId,
+      this.source,
+    );
+    this.applyAnswerPayload();
+  }
+
+  /** Apply Firebase progress to the local assessment model. */
+  applyAnswerPayload() {
+    if (!this.assessment || !this.answersPayload) {
+      return;
+    }
+
+    if (this.answersPayload.assessmentId !== this.assessment.id) {
+      return;
+    }
+
+    this.assessment.questionIndex = this.answersPayload.questionIndex ?? 0;
+    this.assessment.answers = new Map(
+      (this.answersPayload.answers ?? []).map((answer) => {
+        const answerObj = new Answer({
+          assessmentId: this.assessment.id,
+          questionId: answer.questionId,
+          value: answer.value,
+          answeredAt: answer.answeredAt,
+        });
+
+        return [answerObj.questionId, answerObj];
+      }),
+    );
+  }
+
+  /** Render the current screen from app state. */
+  render() {
+    if (!this.root) return;
+
+    this.root.replaceChildren(this.createCurrentScreen());
+  }
+
+  /** Coalesce state-change renders and keep DOM replacement outside access-click handlers. */
+  requestRender() {
+    if (this.renderQueued) {
+      return;
+    }
+
+    this.renderQueued = true;
+
+    window.setTimeout(() => {
+      this.renderQueued = false;
+      this.render();
+    }, 0);
+  }
+
+  /** Build the current screen element from app state. */
+  createCurrentScreen() {
+    if (this.state === STATE_MENU) {
+      return this.views.renderMenu({
+        assessmentIndex: this.assessmentIndex,
+        onSelectAssessment: (assessmentId) => {
+          this.selectAssessment(assessmentId);
+        },
+      });
+    }
+
+    if (this.state === STATE_ASSESSMENT) {
+      if (!this.assessment) {
+        return this.views.renderMessage("Loading assessment...");
+      }
+
+      return this.views.renderAssessment({
+        assessment: this.assessment,
+        onAnswer: (value) => {
+          this.answerCurrentQuestion(value);
+        },
+        onMoveQuestion: (step) => {
+          this.moveQuestion(step);
+        },
+        onShowResult: () => {
+          this.showResult();
+        },
+      });
+    }
+
+    if (this.state === STATE_RESULT) {
+      return this.views.renderResult({
+        answersPayload: this.answersPayload,
+        assessment: this.assessment,
+      });
+    }
+
+    return this.views.renderMessage("Unknown app state.");
+  }
+
+  /** Select an assessment and enter the assessment screen. */
+  selectAssessment(assessmentId) {
+    this.assessmentId = assessmentId;
+    this.assessment = null;
+    this.answersPayload = null;
+
+    this.setFirebaseValue("assessmentId", assessmentId);
+    this.setFirebaseValue("assessmentAnswers", "");
+    this.setFirebaseValue("state", STATE_ASSESSMENT);
   }
 
   /** Save an answer for the current question and publish the updated payload. */
@@ -53,6 +204,29 @@ class PainManagementApp {
 
     this.assessment.answerCurrentQuestion(value);
     this.syncAnswersToFirebase();
+    this.views.updateAnswerSelection(
+      this.root,
+      this.assessment.currentQuestion().id,
+      value,
+    );
+  }
+
+  /** Move the current question and publish the updated payload. */
+  moveQuestion(step) {
+    if (this.state !== STATE_ASSESSMENT || !this.assessment) {
+      return;
+    }
+
+    this.assessment.moveQuestion(step);
+    this.syncAnswersToFirebase();
+    this.requestRender();
+  }
+
+  /** Show the result screen after Squidly activates the result control. */
+  showResult() {
+    this.state = STATE_RESULT;
+    this.setFirebaseValue("state", STATE_RESULT);
+    this.requestRender();
   }
 
   /** Persist the assessment answer payload to Firebase. */
@@ -61,12 +235,15 @@ class PainManagementApp {
       return;
     }
 
-    SquidlyAPI.firebaseSetValue(
-      "assessmentAnswers",
-      JSON.stringify(this.assessment.toAnswerPayload()),
-    );
+    const payload = this.assessment.toAnswerPayload();
+    this.answersPayload = payload;
+    this.setFirebaseValue("assessmentAnswers", JSON.stringify(payload));
+  }
+
+  /** Support the Squidly API naming used across demos. */
+  setFirebaseValue(key, value) {
+    this.stateStore.setValue(key, value);
   }
 }
 
-const app = new PainManagementApp({ source: DEFAULT_SOURCE });
-app.init();
+new PainManagementApp({ source: DEFAULT_SOURCE });
