@@ -72,17 +72,47 @@ export class AssessmentViews {
     const questionSection = document.createElement("section");
     questionSection.className = "assessment-question-section";
 
-    const progress = document.createElement("p");
+    const currentStep = assessment.questionIndex + 1;
+    const totalSteps = assessment.questions.length;
+    const progressPercent = Math.round((currentStep / totalSteps) * 100);
+
+    const progress = document.createElement("div");
     progress.className = "assessment-progress";
-    progress.textContent = `${assessment.questionIndex + 1} / ${
-      assessment.questions.length
-    }`;
-    questionSection.appendChild(progress);
+
+    const progressHeader = document.createElement("div");
+    progressHeader.className = "assessment-progress__header";
 
     const title = document.createElement("h1");
-    title.className = "screen-title assessment-title";
+    title.className = "assessment-title";
     title.textContent = assessment.title;
-    questionSection.appendChild(title);
+    progressHeader.appendChild(title);
+
+    const progressText = document.createElement("p");
+    progressText.className = "assessment-progress__text";
+    progressText.textContent = `${currentStep} / ${totalSteps}`;
+    progressHeader.appendChild(progressText);
+
+    progress.appendChild(progressHeader);
+
+    const progressTrack = document.createElement("div");
+    progressTrack.className = "assessment-progress__track";
+    progressTrack.setAttribute("role", "progressbar");
+    progressTrack.setAttribute("aria-label", "Assessment progress");
+    progressTrack.setAttribute("aria-valuemin", "0");
+    progressTrack.setAttribute("aria-valuemax", String(totalSteps));
+    progressTrack.setAttribute("aria-valuenow", String(currentStep));
+    progressTrack.setAttribute(
+      "aria-valuetext",
+      `Question ${currentStep} of ${totalSteps}`,
+    );
+
+    const progressFill = document.createElement("div");
+    progressFill.className = "assessment-progress__fill";
+    progressFill.style.width = `${progressPercent}%`;
+    progressTrack.appendChild(progressFill);
+    progress.appendChild(progressTrack);
+
+    questionSection.appendChild(progress);
 
     const questionLayout = document.createElement("div");
     questionLayout.className = "question-layout";
