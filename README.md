@@ -13,12 +13,12 @@ Squidly accessibility controls.
 When `app.js` runs, it creates one `PainManagementApp` instance. That instance:
 
 1. Creates the root app container.
-2. Registers Squidly/Firebase state listeners inside `init()`.
+2. Registers Squidly/Firebase listeners inside `init()`.
 3. Loads the assessment index from `question-banks/index.json`.
 4. Renders the current screen.
 
 The remote `state` value defaults to `menu` inside the listener: if no value
-exists when the listener first fires, the app writes `menu` and continues.
+exists on a fresh session the app writes `menu` and continues.
 
 ## App states
 
@@ -27,9 +27,6 @@ The app has three screen states:
 - `menu`: shows the list of available assessments.
 - `assessment`: shows the current question and answer options.
 - `result`: shows the completed answers list with a download button.
-
-The active state is stored locally and mirrored through Squidly/Firebase using
-direct `SquidlyAPI` calls.
 
 ## Screen rendering
 
@@ -42,68 +39,55 @@ Screens are defined as custom element classes in `ui/views.js`:
 | `result` | `ResultsView` |
 | fallback | `MessageView` |
 
-`currentScreen` is a getter that builds the right view from a `STATE_VIEWS` map.
-All event callbacks (`onAnswer`, `onGoHome`, `onMoveQuestion`, etc.) are passed
-in as a single `viewData` object so each view stays stateless.
+`currentScreen` is a getter that picks the right class from a `STATE_VIEWS` map
+and constructs it with a single `viewData` object containing the current
+assessment data and all event callbacks.
 
 ## Screen flow
 
 ### Menu
 
-`MenuView` renders the assessment selection screen. When Squidly emits
-`access-click` on an assessment button, `onSelectAssessment` is called.
+`MenuView` renders the assessment selection screen. When an assessment button is
+activated, `onSelectAssessment` is called, which:
 
-Selecting an assessment:
-
-1. Stores the selected `assessmentId`.
-2. Clears any previous `assessmentAnswers`.
-3. Resets `questionIndex` to `0`.
-4. Sets the remote `state` to `assessment`.
+1. Clears local `assessment` and `answersPayload`.
+2. Writes the new `assessmentId` and clears `assessmentAnswers` in Firebase.
+3. Sets the remote `state` to `assessment`.
 
 ### Assessment
 
-`QuestionView` renders the full assessment screen including navigation, progress,
-question text, an optional image, and the answer buttons.
+`QuestionView` renders navigation, progress, question text, an optional image,
+and the answer buttons.
 
-When an answer is activated, `onAnswer(e, value)` saves the answer into the
-local `Assessment` model and calls `syncAnswers()`.
+When an answer is activated, `onAnswer` saves it to the local `Assessment` model,
+serialises the full payload, and writes it to `assessmentAnswers`.
 
-Answering a question:
+When Previous or Next is pressed, `onMoveQuestion` advances the index, re-serialises
+the payload (which embeds `questionIndex`), and writes it to `assessmentAnswers`.
 
-1. Saves the answer into the local `Assessment` model.
-2. Converts all answers into a JSON-safe payload.
-3. Writes that payload to remote `assessmentAnswers`.
-
-The Previous and Next buttons call `onMoveQuestion(e, step)`, which updates the
-question index, writes the new index to remote `questionIndex`, and syncs the
-updated answer payload.
-
-The Home button calls `onGoHome`, which resets all local and remote assessment
-state back to menu.
+The Home button resets all local and remote state back to menu.
 
 ### Result
 
-On the last question, the Result button appears. Activating it sets the state to
-`result` and renders `ResultsView`.
-
-The result screen shows each question alongside its recorded answer. A download
-button exports the payload as a CSV file.
+On the last question the Result button appears. Activating it sets `state` to
+`result`. `ResultsView` shows each question with its recorded answer and provides
+a CSV download.
 
 ## Data model
 
-The app uses one model file (`models/models.js`) with three classes:
+`models/models.js` defines three classes:
 
-- `Assessment`: owns the question list, current question index, and answers.
-- `Question`: stores one question from a question bank.
-- `Answer`: stores one answer for one question.
+- `Assessment`: owns the question list, current question index, and answers map.
+- `Question`: one question from a question bank.
+- `Answer`: one recorded answer.
 
-`Assessment.toAnswerPayload()` creates the remote payload:
+`Assessment.toAnswerPayload()` produces the payload written to Firebase:
 
 ```json
 {
   "assessmentId": "fear-of-pain",
   "assessmentVersion": "1.0",
-  "questionIndex": 0,
+  "questionIndex": 2,
   "updatedAt": "2026-05-10T00:00:00.000Z",
   "answers": [
     {
@@ -115,68 +99,52 @@ The app uses one model file (`models/models.js`) with three classes:
 }
 ```
 
-## Question banks
+`questionIndex` is stored inside the payload, not as a separate Firebase key.
 
-Assessment metadata lives in:
+## Question banks
 
 ```text
 question-banks/index.json
-```
-
-Each entry points to an assessment JSON file, such as:
-
-```text
 question-banks/fear-of-pain.json
 question-banks/pain-inference.json
 ```
 
 `AssessmentRepository` loads and caches both the index and individual
-assessments. The default source is `default_bank`, which reads local JSON files.
+assessments. The source is `default_bank`, which reads local JSON files.
 
 ## Squidly state integration
 
-The app reads and writes Squidly/Firebase state directly through `SquidlyAPI`.
+The app reads and writes these Firebase keys via `SquidlyAPI`:
 
-It reads and writes these keys:
+- `state` — current app state (`menu`, `assessment`, or `result`)
+- `assessmentId` — ID of the selected assessment
+- `assessmentAnswers` — full answer payload JSON (includes `questionIndex`)
 
-- `state`
-- `assessmentId`
-- `assessmentAnswers`
-- `questionIndex`
+The app expects `SquidlyAPI` to be available before `app.js` runs.
 
-The app expects `SquidlyAPI` to exist before `app.js` runs.
+## State synchronisation
+
+`assessment` and `answersPayload` are smart setters on `PainManagementApp`.
+When either is set they cross-apply to each other: loading an assessment
+restores saved answers and question index from the payload, and receiving a new
+payload applies it to the loaded assessment immediately.
 
 ## Rendering strategy
 
-The app does not use a frontend framework. All screens are built as custom
-element classes in `ui/views.js` using the Squidly `GridLayout` component.
+`requestRender()` schedules a render with `setTimeout(..., 0)` so that multiple
+rapid state changes collapse into one DOM update and no replacement happens
+inside a Squidly `access-click` handler.
 
-`requestRender()` schedules rendering with `setTimeout(..., 0)` instead of
-rendering immediately. This does two things:
-
-- Combines multiple rapid state changes into one render.
-- Avoids replacing DOM nodes during a Squidly `access-click` handler.
-
-Every state change produces a full screen replacement via
-`root.replaceChildren(this.currentScreen)`. There is no partial DOM patching.
-
-The `assessment` and `answersPayload` properties are setters. They apply
-incoming Firebase data to the local model and trigger a render if anything
-changed, so listeners stay simple.
+Every render is a full screen replacement — `root.replaceChildren(this.currentScreen)`.
+There is no partial DOM patching.
 
 ## Styling
 
-The app uses plain CSS only. There is no Tailwind, build step, or package
-manager requirement.
+Plain CSS only. No Tailwind, build step, or package manager.
 
-Important layout choices:
-
-- The page root stays centered.
-- Assessment and result screens are full-viewport grid layouts.
-- Navigation buttons sit in the left column of the grid.
-- Question content and answer buttons fill the main area.
-- Question images use viewport-based sizing so image changes do not cause large
-  layout jumps.
+- Full-viewport grid layouts for assessment and result screens.
+- Navigation in the left column; question and answer content in the main area.
+- Viewport-based image sizing to avoid layout jumps on question changes.
 
 ## Project structure
 
@@ -189,194 +157,6 @@ services/AssessmentRepository.js
                                Loads and caches question-bank data
 ui/views.js                    View classes for each app screen
 ui/squidly-utils.js            Squidly component library
-question-banks/                Assessment JSON files
-images/                        Question and answer images
-```
-
-
-`index.html` loads two files:
-
-- `style.css` for the plain CSS layout and button styling.
-- `app.js` as a browser module for all app logic.
-
-When `app.js` runs, it creates one `PainManagementApp` instance. That instance:
-
-1. Creates the root app container.
-2. Registers Squidly/Firebase state listeners.
-3. Loads the assessment index from `question-banks/index.json`.
-4. Seeds the remote `state` value as `menu`.
-5. Renders the current screen.
-
-## App states
-
-The app has three screen states:
-
-- `menu`: shows the list of available assessments.
-- `assessment`: shows the current question and answer options.
-- `result`: shows the saved answer payload as JSON.
-
-The active state is stored locally and mirrored through Squidly/Firebase using
-direct `SquidlyAPI` calls.
-
-## Screen flow
-
-### Menu
-
-`AssessmentViews.renderMenu()` renders the assessment selection screen.
-
-Each assessment button is wrapped in a Squidly `access-button`. When Squidly
-emits `access-click`, the app calls `selectAssessment(assessmentId)`.
-
-Selecting an assessment:
-
-1. Stores the selected `assessmentId`.
-2. Clears any previous `assessmentAnswers`.
-3. Sets the remote `state` to `assessment`.
-4. Loads the selected assessment JSON.
-
-### Assessment
-
-`AssessmentViews.renderAssessment()` renders the assessment screen in three
-sections:
-
-- Top: Home, Previous, Next, or Result navigation.
-- Middle: progress, title, question text, and optional image.
-- Bottom: scale labels and answer buttons.
-
-Answer buttons are also wrapped in `access-button`. When an answer is activated,
-`onAnswer(value)` calls `answerCurrentQuestion(value)` in `app.js`.
-
-Answering a question:
-
-1. Saves the answer into the local `Assessment` model.
-2. Converts all answers into a JSON-safe payload.
-3. Writes that payload to remote `assessmentAnswers`.
-4. Updates the selected answer styling without replacing the whole screen.
-
-The Previous and Next buttons call `moveQuestion(step)`, which updates the
-current question index and syncs the updated answer payload.
-
-The Home button calls `returnToMenu()`. It returns to the menu and clears the
-active assessment record:
-
-- local `assessmentId`
-- local `assessment`
-- local `answersPayload`
-- remote `assessmentId`
-- remote `assessmentAnswers`
-- remote `state`, back to `menu`
-
-### Result
-
-On the last question, the Result button appears. Activating it sets the state to
-`result` and renders `AssessmentViews.renderResult()`.
-
-The result screen displays the current answer payload. This is useful for
-debugging and for confirming what has been saved remotely.
-
-## Data model
-
-The app uses three model classes:
-
-- `Assessment`: owns the question list, current question index, and answers.
-- `Question`: stores one question from a question bank.
-- `Answer`: stores one answer for one question.
-
-`Assessment.toAnswerPayload()` creates the remote payload:
-
-```json
-{
-  "assessmentId": "fear-of-pain",
-  "assessmentVersion": "1.0",
-  "questionIndex": 0,
-  "updatedAt": "2026-05-10T00:00:00.000Z",
-  "answers": [
-    {
-      "questionId": "fop-1",
-      "value": 2,
-      "answeredAt": "2026-05-10T00:00:00.000Z"
-    }
-  ]
-}
-```
-
-## Question banks
-
-Assessment metadata lives in:
-
-```text
-question-banks/index.json
-```
-
-Each entry points to an assessment JSON file, such as:
-
-```text
-question-banks/fear-of-pain.json
-question-banks/pain-inference.json
-```
-
-`AssessmentRepository` loads and caches both the index and individual
-assessments. The default source is `default_bank`, which reads local JSON files.
-There is also a placeholder `database` source for future database-backed
-loading.
-
-## Squidly state integration
-
-The app reads and writes Squidly/Firebase state directly through
-`SquidlyAPI`.
-
-It reads and writes these keys:
-
-- `state`
-- `assessmentId`
-- `assessmentAnswers`
-
-The app expects `SquidlyAPI` to exist before `app.js` runs.
-
-## Rendering strategy
-
-The app does not use a frontend framework. Screens are built with DOM APIs in
-`AssessmentViews`.
-
-`PainManagementApp.requestRender()` schedules rendering with `setTimeout(..., 0)`
-instead of rendering immediately. This does two things:
-
-- Combines multiple rapid state changes into one render.
-- Avoids replacing DOM nodes during a Squidly `access-click` handler.
-
-Most screen changes replace the root content. Answer selection is the exception:
-`updateAnswerSelection()` updates button classes in place so the selected state
-changes immediately without rebuilding the whole screen.
-
-## Styling
-
-The app uses plain CSS only. There is no Tailwind, build step, or package
-manager requirement.
-
-Important layout choices:
-
-- The page root stays centered.
-- The assessment screen uses a three-section flex layout.
-- Navigation sits at the top of the assessment screen.
-- Question content is centered in the middle section.
-- Answer options stay in the bottom section.
-- Question images use viewport-based sizing so image changes do not cause large
-  layout jumps.
-
-## Project structure
-
-```text
-app.js                         App coordinator and state transitions
-index.html                     Static HTML entry point
-style.css                      Plain CSS styles
-models/Assessment.js           Assessment state model
-models/Answer.js               Answer model
-models/Question.js             Question model
-services/AssessmentRepository.js
-                               Loads question-bank data
-ui/AssessmentViews.js          DOM rendering for screens
-ui/accessButton.js             Squidly access-button helper
-ui/uiClasses.js                Small UI class helper
 question-banks/                Assessment JSON files
 images/                        Question and answer images
 ```
