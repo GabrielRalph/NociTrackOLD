@@ -1,4 +1,4 @@
-import { Assessment } from "../models/Assessment.js";
+import { Assessment } from "../models/models.js";
 
 const DEFAULT_QUESTION_BANK_INDEX_URL = "./question-banks/index.json";
 
@@ -27,7 +27,7 @@ export class AssessmentRepository {
     const cacheKey = `${source}:${assessmentId}`;
 
     if (this.assessmentCache.has(cacheKey)) {
-      return new Assessment(this.assessmentCache.get(cacheKey));
+      return Assessment.make(this.assessmentCache.get(cacheKey));
     }
 
     const sourceLoader = this.sources[source];
@@ -44,7 +44,7 @@ export class AssessmentRepository {
 
     this.assessmentCache.set(cacheKey, assessmentData);
 
-    return new Assessment(assessmentData);
+    return Assessment.make(assessmentData);
   }
 
   /** Load and cache the list of available assessments for a source. */

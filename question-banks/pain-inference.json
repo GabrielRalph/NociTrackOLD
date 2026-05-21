@@ -3,10 +3,17 @@
   "title": "Pain Inference Questionnaire",
   "description": "In the past week, how much has pain gotten in the way with:",
   "version": "1.0",
+  "answerImages": {
+    "0": {"src": "images/glass_1.svg", "alt": "Empty glass"},
+    "1": {"src": "images/glass_2.svg", "alt": "Semi empty glass"},
+    "2": {"src": "images/glass_3.svg", "alt": "Half full glass"},
+    "3": {"src": "images/glass_4.svg", "alt": "Almost full glass"},
+    "4": {"src": "images/glass_5.svg", "alt": "Full glass"}
+  },
   "questions": [
     {
       "id": 1,
-      "question": "Sleep",
+      "question": "In the past week, how much has pain gotten in the way with: Sleep",
       "imageUrl": "images/pi-1.png",
       "responseType": "likert",
       "scale": {
@@ -22,7 +29,7 @@
     },
     {
       "id": 2,
-      "question": "Everyday activities",
+      "question": "In the past week, how much has pain gotten in the way with: Everyday activities",
       "imageUrl": "images/pi-2.png",
       "responseType": "likert",
       "scale": {
@@ -38,7 +45,7 @@
     },
     {
       "id": 3,
-      "question": "Mood",
+      "question": "In the past week, how much has pain gotten in the way with: Mood",
       "imageUrl": "images/pi-3.png",
       "responseType": "likert",
       "scale": {
@@ -54,7 +61,7 @@
     },
     {
       "id": 4,
-      "question": "School/Work",
+      "question": "In the past week, how much has pain gotten in the way with: School/Work",
       "imageUrl": "images/pi-4.png",
       "responseType": "likert",
       "scale": {
@@ -70,7 +77,7 @@
     },
     {
       "id": 5,
-      "question": "Things I do for fun",
+      "question": "In the past week, how much has pain gotten in the way with: Things I do for fun",
       "imageUrl": "images/pi-5.png",
       "responseType": "likert",
       "scale": {
@@ -86,7 +93,7 @@
     },
     {
       "id": 6,
-      "question": "Looking after myself",
+      "question": "In the past week, how much has pain gotten in the way with: Looking after myself",
       "imageUrl": "images/pi-6.png",
       "responseType": "likert",
       "scale": {
@@ -102,7 +109,7 @@
     },
     {
       "id": 7,
-      "question": "Learning new things",
+      "question": "In the past week, how much has pain gotten in the way with: Learning new things",
       "imageUrl": "images/pi-7.png",
       "responseType": "likert",
       "scale": {
@@ -118,7 +125,7 @@
     },
     {
       "id": 8,
-      "question": "Getting along with others",
+      "question": "In the past week, how much has pain gotten in the way with: Getting along with others",
       "imageUrl": "images/pi-8.png",
       "responseType": "likert",
       "scale": {
@@ -134,7 +141,7 @@
     },
     {
       "id": 9,
-      "question": "Communicating with others",
+      "question": "In the past week, how much has pain gotten in the way with: Communicating with others",
       "imageUrl": "images/pi-9.png",
       "responseType": "likert",
       "scale": {
@@ -150,7 +157,7 @@
     },
     {
       "id": 10,
-      "question": "Having fun",
+      "question": "In the past week, how much has pain gotten in the way with: Having fun",
       "imageUrl": "images/pi-10.png",
       "responseType": "likert",
       "scale": {
@@ -166,7 +173,7 @@
     },
     {
       "id": 11,
-      "question": "Spending time with friends and family",
+      "question": "In the past week, how much has pain gotten in the way with: Spending time with friends and family",
       "imageUrl": "images/pi-11.png",
       "responseType": "likert",
       "scale": {
@@ -182,7 +189,7 @@
     },
     {
       "id": 12,
-      "question": "Getting around",
+      "question": "In the past week, how much has pain gotten in the way with: Getting around",
       "imageUrl": "images/pi-12.png",
       "responseType": "likert",
       "scale": {
@@ -198,7 +205,7 @@
     },
     {
       "id": 13,
-      "question": "My favourite thing to do: _________",
+      "question": "In the past week, how much has pain gotten in the way with: My favourite thing to do: _________",
       "imageUrl": "images/pi-13.png",
       "responseType": "likert",
       "scale": {

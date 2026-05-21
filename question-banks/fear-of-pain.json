@@ -3,6 +3,13 @@
   "title": "Fear of Pain Questionnaire",
   "description": "When you are hurt or in pain for a few hours or days, how does pain make you feel?",
   "version": "1.0",
+  "answerImages": {
+    "0": {"src": "images/i_not-me.png", "alt": "That's not me"},
+    "1": {"src": "images/i_blank.png", "alt": "blank"},
+    "2": {"src": "images/i_idk.png", "alt": "Thats sometimes me"},
+    "3": {"src": "images/i_blank.png", "alt": "blank"},
+    "4": {"src": "images/i_thats-me.png", "alt": "Thats me"}
+  },
   "questions": [
     {
       "id": 1,
