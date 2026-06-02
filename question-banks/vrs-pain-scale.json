@@ -1,0 +1,26 @@
+{
+  "id": "vrs-pain-scale",
+  "title": "VRS Pain Scale",
+  "description": "When you are hurt or in pain for a few hours or days, how does pain make you feel?",
+  "version": "1.0",
+  "answerImages": {
+    "0": { "src": "images/happy.png", "alt": "Happy" },
+    "2": { "src": "images/smile.png", "alt": "Smile" },
+    "4": { "src": "images/neutral.png", "alt": "Neutral" },
+    "6": { "src": "images/sad.png", "alt": "Sad" },
+    "8": { "src": "images/sader.png", "alt": "Sader" },
+    "10": { "src": "images/crying.png", "alt": "Crying" }
+  },
+  "questions": [
+    {
+      "id": 1.25,
+      "question": "Choose a number from 0 to 10 that best describes your pain",
+      "imageUrl": "images/location.png",
+      "scale": {
+        "min": 0,
+        "max": 10,
+        "step": 2
+      }
+    }
+  ]
+}

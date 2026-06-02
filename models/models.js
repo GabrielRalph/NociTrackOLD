@@ -74,6 +74,8 @@ class Scale extends DataClass {
     options = [];
     static options_parser(o) { return Array.isArray(o) ? [...o] : [] }
 
+    /** @type {Object} */
+    labels = {};
 
     get values() {
         let values = this.options;
@@ -173,7 +175,7 @@ class Assessment extends DataClass {
     questionIndex = 0;
 
     /** @type {Object<string, ImageInfo>} */
-    answerImages = {...ANSWER_IMAGES};
+    answerImages = {}; //{...ANSWER_IMAGES};
     static answerImages_parser(ai) {
         let images = {};
         if (ai && typeof ai === "object") {
@@ -181,7 +183,7 @@ class Assessment extends DataClass {
                 images[key] = ImageInfo.make(ai[key]);
             }
         } else {
-            images = {...ANSWER_IMAGES};
+            // images = {...ANSWER_IMAGES};
         }
         return images;
     }

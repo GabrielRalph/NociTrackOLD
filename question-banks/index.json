@@ -12,5 +12,12 @@
     "description": "In the past week, how much has pain gotten in the way with:",
     "version": "1.0",
     "url": "./question-banks/pain-inference.json"
+  },
+  {
+    "id": "vrs-pain-scale",
+    "title": "VRS Pain Scale",
+    "description": "In the past week, how much has pain gotten in the way with:",
+    "version": "1.0",
+    "url": "./question-banks/vrs-pain-scale.json"
   }
 ]
